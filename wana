@@ -1,0 +1,234 @@
+#!/bin/sh
+POSIXLY_CORRECT=yes
+
+a_filtr='0'
+b_filtr='0'
+ip_filtr='0'
+uri_filtr='0'
+
+if [ "$#" -eq '0' ]; then
+echo "zadali jste 0 argumentu"
+exit 0
+fi
+
+while [ "$#" != '0' ]; do
+if [ "$1" = "list-ip" ]; then
+  pom="$1"
+  shift
+elif [ "$1" = "list-hosts" ]; then
+  pom="$1"
+  shift
+elif [ "$1" = "list-uri" ]; then
+  pom="$1"
+  shift
+elif [ "$1" = "hist-ip" ]; then
+  pom="$1"
+  shift
+elif [ "$1" = "hist-load" ]; then
+  pom="$1"
+  shift
+elif [ "$1" = "-a" ]; then
+  a_filtr='1'
+  shift
+  A="$1"
+  A="$( echo "$A" | tr -d ' ' | tr -d ':' | tr -d '-' | tr -d '"' )"
+  if [ '1000000000000' -gt "$A" ]; then
+  A="${A}00"
+  fi
+  shift
+elif [ "$1" = "-b" ]; then
+  b_filtr='1'
+  shift
+  B="$1"
+  B="$( echo "$B" | tr -d ' ' | tr -d ':' | tr -d '-' | tr -d '"' )"
+  if [ '1000000000000' -gt "$B" ]; then
+  B="${B}00"
+  fi
+  shift
+elif [ "$1" = "-ip" ]; then
+  ip_filtr='1'
+  shift
+  IP="$1"
+  shift
+elif [ "$1" = "-uri" ]; then
+  uri_filtr='1'
+  shift
+  URI="$1"
+  shift
+else
+  break
+fi
+done
+
+if [ "$1" != '0' ]; then
+  pomocna="$( zcat -f "$1" )"
+  shift
+fi
+
+while [ "$#" != '0' ]; do
+    pomocna="${pomocna}\n$( zcat -f "$1" )"
+    shift
+done
+
+if [ "$ip_filtr" = '1' ]; then
+  pomocna="$( echo "$pomocna" | grep "$IP" )"
+fi
+
+if [ "$a_filtr" = '1' ]; then
+  result=""
+  extra="$( echo "$pomocna" | awk '{ print $1 " " $4 }' | tr -d "[" )"
+  counter='0'
+  IP1=" "
+  for i in $extra
+  do
+    counter=$(( counter + 1 ))
+    if [ "$counter" = 1 ]; then
+      if [ "$IP1" != "$i" ]; then
+        IP1="$i"
+      else
+        mby_err='1'
+      fi
+    fi
+    if [ "$counter" = 2 ]; then
+      if [ "$datum" != "$i" ] || [ "$mby_err" != '1' ]; then
+        datum="$i"
+        extra2="$( echo "$datum" | tr "/" " " | tr -d "[" | sed 's/:/ /1' )"
+        extra2="$(date -d"$extra2" +%Y%m%d%H%M%S)"
+        if [ "$extra2" -gt "$A" ]; then
+          extra2="$( echo "$pomocna" | grep "$datum" )"
+          extra2="$( echo "$extra2" | grep "$IP1" )"
+          result="${result}\n${extra2}"
+        fi
+        mby_err='0'
+      else
+        mby_err='0'
+      fi
+    counter='0'
+    fi
+  done
+  result="$( echo "$result" | grep ":" )"
+  pomocna="$result"
+fi
+
+if [ "$b_filtr" = '1' ]; then
+  result=""
+  extra="$( echo "$pomocna" | awk '{ print $1 " " $4 }' | tr -d "[" )"
+  counter='0'
+  IP1=" "
+  for i in $extra
+  do
+    counter=$(( counter + 1 ))
+    if [ "$counter" = 1 ]; then
+      if [ "$IP1" != "$i" ]; then
+        IP1="$i"
+      else
+        mby_err='1'
+      fi
+    fi
+    if [ "$counter" = 2 ]; then
+      if [ "$datum" != "$i" ] || [ "$mby_err" != '1' ]; then
+        datum="$i"
+        extra2="$( echo "$datum" | tr "/" " " | tr -d "[" | sed 's/:/ /1' )"
+        extra2="$(date -d"$extra2" +%Y%m%d%H%M%S)"
+        if [ "$B" -gt "$extra2" ]; then
+          extra2="$( echo "$pomocna" | grep "$datum" )"
+          extra2="$( echo "$extra2" | grep "$IP1" )"
+          result="${result}\n${extra2}"
+        fi
+        mby_err='0'
+      else
+        mby_err='0'
+      fi
+    counter='0'
+    fi
+  done
+  result="$( echo "$result" | grep ":" )"
+  pomocna="$result"
+fi
+
+if [ "$uri_filtr" = '1' ]; then
+  pomocna="$( echo "$pomocna" | grep "$URI" )"
+fi
+
+case "$pom" in
+  list-ip)
+  pomocna="$( echo "$pomocna" | awk '{ print $1 }'  | sort | uniq)"
+  echo "$pomocna"
+  ;;
+  list-hosts)
+  pomocna="$( echo "$pomocna" | awk '{ print $1 }' | sort | uniq)"
+  for i in $pomocna
+  do
+    extra="$(host "$i")"
+    extra="$( echo "$extra" | awk '{ print $5 }' )"
+    if [ "$extra" != "3(NXDOMAIN)" ] && [ "$extra" != "2(SERVFAIL)" ]; then
+      echo "$extra"
+    else
+      echo "$i"
+    fi
+  done
+  ;;
+  list-uri)
+  pomocna="$( echo "$pomocna" | awk '{ print $7 }' )"
+  pomocna="$( echo "$pomocna" | grep "/" | sort | uniq )"
+  echo "$pomocna"
+  ;;
+  hist-ip)
+  pomocna="$( echo "$pomocna" | awk '{ print $1 }' | sort | uniq -c )"
+  pomocna="$( echo "$pomocna" | sort -n -r )"
+  counter='0'
+  for i in $pomocna
+  do
+    extra="$extra $i"
+    counter=$(( counter + 1 ))
+    if [ "$counter" = "2" ]; then
+    extra="$( echo "$extra" | cut -d ' ' -f 2 )"
+    result="${result}\n${i} (${extra}): "
+    counter='0'
+    while [ "$counter" != "$extra" ]; do
+      result="${result}#"
+      counter=$(( counter + 1 ))
+    done
+    counter='0'
+    extra=""
+    fi
+  done
+  result="$( echo "$result" | grep "(" )"
+  echo "$result"
+  ;;
+  hist-load)
+  extra="$( echo "$pomocna" | awk '{ print $4 }' )"
+  for i in $extra
+  do
+    extra2="$( echo "$i" | tr "/" " " | tr -d "[" | sed 's/:/ /1' )"
+    extra2="$(date -d"$extra2" +%Y-%m-%d" "%H:%M:%S)"
+    extra2="$( echo "$extra2" | cut -c 1-14 )"
+    result="${result}\n[${extra2}"
+  done
+  result="$( echo "$result" | grep ":" | sed 's/ /*/1' )"
+  result="$( echo "$result" | sort | uniq -c | tr -d '[' )"
+  extra=""
+  extra2=""
+  for i in $result
+  do
+    extra="$extra $i"
+    counter=$(( counter + 1 ))
+    if [ "$counter" = "2" ]; then
+    extra="$( echo "$extra" | cut -d ' ' -f 2 )"
+    extra2="${extra2}\n${i}00 (${extra}): "
+    counter='0'
+    while [ "$counter" != "$extra" ]; do
+      extra2="${extra2}#"
+      counter=$(( counter + 1 ))
+    done
+    counter='0'
+    extra=""
+    fi
+  done
+  pomocna="$( echo "$extra2" | grep ":" | sed 's/*/ /1' )"
+  echo "$pomocna"
+  ;;
+  *)
+  echo "$pomocna"
+  ;;
+esac
