@@ -8,14 +8,14 @@
     - před použitím rozbalte sadu logů a skript umístěte do adresáře s logy
 
 ### Volby
-    - PŘÍKAZ může být jeden z:
+##### PŘÍKAZ může být jeden z:
         - list-ip – výpis seznamu zdrojových IP adres.
         - list-hosts – výpis seznamu zdrojových doménových jmen.
         - list-uri – výpis seznamu cílových zdrojů (URI).
         - hist-ip – výpis histogramu četností dotazů podle zdrojových IP adres.
         - hist-load – výpis histogramu zátěže (tj. počtu dotazů ve jednotlivých
         časových intervalech).
-    - FILTR může být kombinace následujících:
+##### FILTR může být kombinace následujících:
         - -a DATETIME – after = jsou uvažovány pouze záznamy PO tomto
         datu (bez tohoto data). DATETIME je formátu YYYY-MM-DD HH:MM:SS.
         - -b DATETIME – before, jsou uvažovány pouze záznamy PŘED tímto
